@@ -30,13 +30,5 @@ jobs:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
         run: node robot_daily_report.js
       
-      - name: 💾 保存报告
-        if: success()
-        uses: actions/upload-artifact@v3
-        with:
-          name: daily-report
-          path: reports/*.md
-          retention-days: 7
-      
       - name: ✅ 任务完成
         run: echo "✅ 今日日报已生成并发送！"
