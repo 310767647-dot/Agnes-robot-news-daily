@@ -1,21 +1,7 @@
 #!/usr/bin/env node
 /**
  * 具身机器人日报 - GitHub Actions 兼容版
- * 使用原生 http 模块，避免依赖冲突
  */
-// 在步骤4发送飞书的代码附近，改为：
-try {
-  if (this.webhookUrl) {
-    logger.info('步骤4/5：正在通过飞书机器人发送通知...');
-    await this.sendToFeishu(message);
-    logger.info('飞书推送完成！');
-  } else {
-    logger.info('跳过飞书推送（未配置 Webhook）');
-  }
-} catch (error) {
-  logger.warn(`飞书推送有警告：${error.message}`);
-  // 不要 throw，让程序继续执行步骤5
-}
 
 const logger = require('./utils/logger');
 const { collectSearchInfo } = require('./scripts/collect_search');
@@ -23,7 +9,6 @@ const MessageFormatter = require('./scripts/format_messages');
 const settings = require('./config/settings.json');
 const fs = require('fs');
 const path = require('path');
-const http = require('http'); // 使用 Node.js 原生 http 模块，不依赖 axios
 const https = require('https'); // 用于 HTTPS 请求
 const { format } = require('date-fns');
 
@@ -56,8 +41,13 @@ class RobotNewsDailyReport {
     // 步骤4：发送飞书（如果配置了 webhook）
     if (this.webhookUrl) {
       logger.info('步骤4/5：正在通过飞书机器人发送通知...');
-      await this.sendToFeushu(message);
-      logger.info('飞书推送完成！');
+      try {
+        await this.sendToFeishu(message);
+        logger.info('飞书推送完成！');
+      } catch (error) {
+        logger.warn(`飞书推送有警告：${error.message}`);
+        // 不抛出错误，继续执行步骤5
+      }
     } else {
       logger.info('跳过飞书推送（未配置 Webhook）');
     }
@@ -70,75 +60,63 @@ class RobotNewsDailyReport {
     return { success: true, message: message };
   }
 
-async sendToFeishu(message) {
-  // 使用 Node.js 原生 https 模块发送 POST 请求
-  const payload = {
-    msg_type: 'markdown',
-    content: {
-      markdown: message.content
-    }
-  };
-
-  const postData = JSON.stringify(payload);
-  
-  try {
-    const options = {
-      hostname: new URL(this.webhookUrl).hostname,
-      path: new URL(this.webhookUrl).pathname,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData, 'utf8')
-      },
-      timeout: 15000 // 15秒超时
+  async sendToFeishu(message) {
+    // 使用 Node.js 原生 https 模块发送 POST 请求
+    const payload = {
+      msg_type: 'markdown',
+      content: {
+        markdown: message.content
+      }
     };
 
-    const protocol = require('https'); // 飞书 webhook 是 HTTPS
+    const postData = JSON.stringify(payload);
     
-    return new Promise((resolve, reject) => {
-      const req = protocol.request(options, (res) => {
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => {
-          try {
-            const result = JSON.parse(data);
-            logger.info('✅ 飞书推送成功！响应：' + JSON.stringify(result));
-            resolve({ success: true, data: result });
-          } catch (e) {
-            logger.info('飞书返回非JSON数据：' + data);
-            resolve({ success: true, raw: data });
-          }
+    try {
+      const options = {
+        hostname: new URL(this.webhookUrl).hostname,
+        path: new URL(this.webhookUrl).pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData, 'utf8')
+        },
+        timeout: 15000
+      };
+
+      return new Promise((resolve, reject) => {
+        const req = https.request(options, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              const result = JSON.parse(data);
+              logger.info('✅ 飞书推送成功！响应：' + JSON.stringify(result));
+              resolve({ success: true, data: result });
+            } catch (e) {
+              logger.info('飞书返回非JSON数据：' + data);
+              resolve({ success: true, raw: data });
+            }
+          });
         });
+
+        req.on('error', (error) => {
+          logger.error('❌ 飞书推送错误：' + error.message);
+          reject(error);
+        });
+
+        req.write(postData, 'utf8');
+        req.end();
+
+        setTimeout(() => {
+          req.destroy();
+          reject(new Error('飞书推送请求超时'));
+        }, 15000);
       });
-
-      req.on('error', (error) => {
-        logger.error('❌ 飞书推送错误：' + error.message);
-        reject(error);
-      });
-
-      req.write(postData, 'utf8');
-      req.end();
-
-      // 设置超时
-      setTimeout(() => {
-        req.destroy();
-        reject(new Error('飞书推送请求超时'));
-      }, 15000);
-    });
-  } catch (error) {
-    // 如果 https 模块失败，尝试 http 作为备用
-    logger.warn('https 请求失败，尝试回退方案...');
-    
-    // 这里可以添加更简单的备选方案，比如直接 console.log 输出消息内容
-    logger.info('💡 备用方案：飞书消息内容为：');
-    logger.info(message.content.substring(0, 500) + '...');
-    
-    return {
-      success: false,
-      error: '飞书推送失败，可能是网络限制导致。但消息内容已记录到日志中。'
-    };
+    } catch (error) {
+      logger.warn('sendToFeishu 发生错误：' + error.message);
+      throw error;
+    }
   }
-}
 
   async saveReportFile(message, searchResults) {
     const reportDir = path.join(__dirname, settings.output.report_dir);
@@ -176,7 +154,7 @@ async sendToFeishu(message) {
   }
 }
 
-// 如果直接运行此文件
+// 主执行入口 - 使用 async IIFE 避免顶部 await 语法错误
 if (require.main === module) {
   (async function run() {
     try {
