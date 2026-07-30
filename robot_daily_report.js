@@ -176,9 +176,9 @@ async sendToFeishu(message) {
   }
 }
 
-// 主执行入口
+// 如果直接运行此文件
 if (require.main === module) {
-  (async () => {
+  (async function run() {
     try {
       const report = new RobotNewsDailyReport();
       await report.generateReport();
