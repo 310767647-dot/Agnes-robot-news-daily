@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * 具身机器人日报 - 精简版（兼容 GitHub Actions）
+ * 具身机器人日报 - GitHub Actions 兼容版
+ * 使用原生 http 模块，避免依赖冲突
  */
 
 const logger = require('./utils/logger');
@@ -9,6 +10,8 @@ const MessageFormatter = require('./scripts/format_messages');
 const settings = require('./config/settings.json');
 const fs = require('fs');
 const path = require('path');
+const http = require('http'); // 使用 Node.js 原生 http 模块，不依赖 axios
+const https = require('https'); // 用于 HTTPS 请求
 const { format } = require('date-fns');
 
 class RobotNewsDailyReport {
@@ -40,7 +43,7 @@ class RobotNewsDailyReport {
     // 步骤4：发送飞书（如果配置了 webhook）
     if (this.webhookUrl) {
       logger.info('步骤4/5：正在通过飞书机器人发送通知...');
-      await this.sendToFeishu(message);
+      await this.sendToFeushu(message);
       logger.info('飞书推送完成！');
     } else {
       logger.info('跳过飞书推送（未配置 Webhook）');
@@ -55,7 +58,7 @@ class RobotNewsDailyReport {
   }
 
   async sendToFeishu(message) {
-    // 极简版飞书发送 - 不使用外部 send_feishu.js 模块，避免依赖冲突
+    // 使用 Node.js 原生 http 模块发送 POST 请求，完全避免依赖问题
     const payload = {
       msg_type: 'markdown',
       content: {
@@ -63,24 +66,50 @@ class RobotNewsDailyReport {
       }
     };
 
-    // 使用原生 fetch（Node.js 18+ 支持全局 fetch），避免 axios 的 undici 问题
-    try {
-      const response = await fetch(this.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload),
-        timeout: 10000
+    const postData = JSON.stringify(payload);
+    
+    // 根据 URL 协议选择 http 或 https 模块
+    const protocol = this.webhookUrl.startsWith('https') ? https : http;
+    
+    const options = {
+      hostname: new URL(this.webhookUrl).hostname,
+      path: new URL(this.webhookUrl).pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData, 'utf8')
+      }
+    };
+
+    return new Promise((resolve, reject) => {
+      const req = protocol.request(options, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            logger.info('飞书响应：' + JSON.stringify(result));
+            resolve({ success: true, data: result });
+          } catch (e) {
+            resolve({ success: true, raw: data });
+          }
+        });
       });
-      
-      const result = await response.json();
-      logger.info('飞书响应：' + JSON.stringify(result));
-    } catch (error) {
-      // fallback: 使用简易的 http 模块或忽略错误
-      logger.warn('sendToFeishu 发生非致命错误，继续执行：' + error.message);
-      // 这里可以添加简单的 http 请求作为备选方案
-    }
+
+      req.on('error', (error) => {
+        console.error('Request error:', error);
+        reject(error);
+      });
+
+      req.write(postData, 'utf8');
+      req.end();
+
+      // 设置超时
+      setTimeout(() => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      }, 10000);
+    });
   }
 
   async saveReportFile(message, searchResults) {
