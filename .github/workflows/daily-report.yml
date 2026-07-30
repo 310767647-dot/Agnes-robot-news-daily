@@ -2,7 +2,7 @@ name: 具身机器人日报
 
 on:
   schedule:
-    - cron: '1 1 * * *'  # UTC 1:00 = 北京时间 9:00
+    - cron: '1 1 * * *'  # UTC 1:00 = 北京时间 9:00（晨间！）
   workflow_dispatch:
 
 jobs:
@@ -16,13 +16,14 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-      
-      - run: npm ci
-      
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund  # 快速安装，跳过审计和捐赠提示
+
       - name: Run daily report
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
         run: node robot_daily_report.js
-      
-      - name: Check result
-        run: echo "Job completed with code $?"
+
+      - name: Verify completion
+        run: echo "✅ Daily report job completed successfully!"
