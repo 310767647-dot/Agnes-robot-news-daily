@@ -2,7 +2,7 @@ name: 具身机器人日报
 
 on:
   schedule:
-    - cron: '0 9 * * *'  # 每天北京时间 9:00
+    - cron: '1 1 * * *'  # 每天 UTC 1:00 = 北京时间 9:00（注意：这是晨间时间！）
   workflow_dispatch:    # 允许手动触发
 
 jobs:
@@ -11,24 +11,29 @@ jobs:
     
     steps:
       - name: 📥 检出代码
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: 🐳 设置 Node.js 环境
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '18'  # 使用 Node.js 18，兼容性最好
           cache: 'npm'
 
       - name: 📦 安装项目依赖
         run: npm ci
-      
-      - name: 🔑 配置飞书 Webhook
+
+      - name: 🔑 配置飞书 Webhook（从 Secret 读取）
         run: echo "FEISHU_WEBHOOK_URL=${{ secrets.FEISHU_WEBHOOK_URL }}" >> $GITHUB_ENV
-      
+
       - name: 🚀 执行日报生成与推送
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
         run: node robot_daily_report.js
-      
-      - name: ✅ 任务完成
-        run: echo "✅ 今日日报已生成并发送！"
+
+      - name: ✅ 任务完成验证
+        if: success()
+        run: echo "✅ 今日日报已成功生成并发送！"
+
+      - name: ❌ 失败告警
+        if: failure()
+        run: echo "❌ 日报生成失败！请检查日志。" | tee -a /dev/stderr
