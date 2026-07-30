@@ -11,8 +11,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.6.7",        // 使用更稳定的 1.x 版本
-    "cheerio": "^1.0.0-rc.12", // 稳定版
-    "date-fns": "^2.30.0"      // Node.js 18 友好版本
+    "axios": "^1.6.7",        
+    "cheerio": "^1.0.0-rc.12", 
+    "date-fns": "^2.30.0" 
   }
 }
