@@ -61,6 +61,9 @@ class RobotNewsDailyReport {
   }
 
   async sendToFeishu(message) {
+  console.log('=== DEBUG: sendToFeishu 开始 ===');
+  console.log('Webhook URL:', this.webhookUrl);
+  console.log('URL length:', this.webhookUrl ? this.webhookUrl.length : 'null');
     // 使用 Node.js 原生 https 模块发送 POST 请求
     const payload = {
       msg_type: 'markdown',
