@@ -1,0 +1,19 @@
+{
+  "name": "robot-news-daily",
+  "version": "1.0.0",
+  "description": "Daily automated report on embodied robots (具身机器人) from Chinese and global sources",
+  "main": "robot_daily_report.js",
+  "scripts": {
+    "start": "node robot_daily_report.js",
+    "dev": "node --watch robot_daily_report.js"
+  },
+  "keywords": ["embodied-robot", "news-aggregator", "feishu-bot", "automation"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.3",
+    "date-fns": "^2.30.0",
+    "crypto-js": "^4.2.0"
+  }
+}

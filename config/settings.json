@@ -1,0 +1,38 @@
+{
+  "bot": {
+    "webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/5a31043e-5ed0-4199-a4c3-7c57490f4d49",
+    "default_user_name": "机器人日报助手"
+  },
+  "search": {
+    "keywords": [
+      "具身机器人",
+      "身体智能机器人",
+      "embodied AI robot",
+      "人形机器人",
+      "humanoid robot",
+      "具身智能",
+      "Embodied Intelligence",
+      "机器臂",
+      "robotic arm",
+      "服务机器人",
+      "service robot"
+    ],
+    "sources": ["baidu", "bing", "google_news"],
+    "max_results_per_source": 10,
+    "language": "zh-CN",
+    "time_range": "day"
+  },
+  "schedule": {
+    "hour": 9,
+    "minute": 0,
+    "timezone": "Asia/Shanghai"
+  },
+  "logging": {
+    "level": "info",
+    "file": "logs/daily_report.log"
+  },
+  "output": {
+    "report_dir": "reports",
+    "filename_format": "%Y-%m-%d_日报.md"
+  }
+}
